@@ -15,6 +15,14 @@ CREATE TABLE IF NOT EXISTS orders (
     amount     REAL    NOT NULL,
     created_at TEXT    NOT NULL   -- ISO date, e.g. 2026-09-18
 );
+
+-- Bookkeeping for generated files: the PDF itself lives on disk, the
+-- database only remembers where (store and link, don't pass the bytes around).
+CREATE TABLE IF NOT EXISTS reports (
+    id         INTEGER PRIMARY KEY,
+    path       TEXT NOT NULL,     -- relative to the project root, e.g. reports/3.pdf
+    created_at TEXT NOT NULL      -- ISO timestamp, local time
+);
 """
 
 
