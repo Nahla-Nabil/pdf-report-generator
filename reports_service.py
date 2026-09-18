@@ -2,7 +2,8 @@
 
 import os
 import sqlite3
-from datetime import datetime
+import threading
+from datetime import date, datetime
 from pathlib import Path
 from uuid import uuid4
 
@@ -32,6 +33,41 @@ def get_report(report_id: int) -> dict | None:
         return to_dict(row) if row else None
     finally:
         conn.close()
+
+
+def report_from_today() -> dict | None:
+    """The newest report generated today (local date), if there is one."""
+    conn = db.connect()
+    try:
+        row = conn.execute(
+            "SELECT * FROM reports WHERE substr(created_at, 1, 10) = ? ORDER BY id DESC LIMIT 1",
+            (date.today().isoformat(),),
+        ).fetchone()
+        return to_dict(row) if row else None
+    finally:
+        conn.close()
+
+
+# "Check whether today's report exists, then generate it" is two steps, and a
+# double-click lands the second request *between* them: it checks while the
+# first is still rendering (nothing in the database yet) and generates a
+# duplicate. The lock makes check+generate one atomic step, so the second
+# request waits, then finds the first one's report.
+#
+# Limit: a threading.Lock only protects ONE server process. With several
+# workers or instances you need the database to referee instead (see README).
+_generate_lock = threading.Lock()
+
+
+def get_or_create_report(force: bool = False) -> tuple[dict, bool]:
+    """Returns (report, created). created=False means an existing report from
+    today was reused instead of generating another."""
+    with _generate_lock:
+        if not force:
+            existing = report_from_today()
+            if existing:
+                return existing, False
+        return create_report(), True
 
 
 def create_report() -> dict:

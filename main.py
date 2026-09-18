@@ -1,7 +1,8 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Response
 from fastapi.responses import FileResponse
+from pydantic import BaseModel
 
 import db
 import reports_service
@@ -18,6 +19,10 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="PDF report generator", lifespan=lifespan)
 
 
+class CreateReport(BaseModel):
+    force: bool = False  # true = skip the "already generated today" check
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
@@ -28,10 +33,16 @@ def health():
 
 
 @app.post("/reports", status_code=201)
-def create_report():
+def create_report(response: Response, body: CreateReport | None = None):
     """Runs the whole pipeline inside the request. Yes, it takes a few
-    seconds. See the README for when that stops being acceptable."""
-    report = reports_service.create_report()
+    seconds. See the README for when that stops being acceptable.
+
+    Idempotent per day: if a report was already generated today, return that
+    one (200) instead of making another (201). Send {"force": true} to
+    generate a fresh one anyway."""
+    report, created = reports_service.get_or_create_report(force=bool(body and body.force))
+    if not created:
+        response.status_code = 200  # same request twice -> the existing report, no new file
     return {"id": report["id"], "file": report["file"]}
 
 
