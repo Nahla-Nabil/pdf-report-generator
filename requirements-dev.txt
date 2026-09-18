@@ -1,0 +1,3 @@
+-r requirements.txt
+# Only for verify_pdf.py, which checks the generated PDF.
+pymupdf
