@@ -1,0 +1,12 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+
+# Generated artifacts and the database: the seed script is their recipe.
+reports/
+report.db
+report.db-journal
+
+# Secrets / local config
+.env
